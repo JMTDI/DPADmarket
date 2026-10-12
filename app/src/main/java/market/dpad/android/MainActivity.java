@@ -65,6 +65,7 @@ public class MainActivity extends Activity {
     private LinearLayout root;
     private String activeCategory = "All";
     private String query = "";
+    private boolean showingDownloaded;
     private AppEntry selected;
     private boolean showingSettings;
     private boolean darkTheme;
@@ -120,17 +121,32 @@ public class MainActivity extends Activity {
         LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(20), dp(20), dp(20), dp(32));
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        if ("Apps".equals(title) || "Downloaded".equals(title)) addBottomBar();
         setContentView(root); currentContent = content;
     }
     private LinearLayout currentContent;
 
+    private void addBottomBar() {
+        LinearLayout bar = new LinearLayout(this); bar.setPadding(dp(12), dp(8), dp(12), dp(10));
+        bar.setBackgroundColor(PANEL);
+        Button apps = button("Apps", showingDownloaded ? FG : BG, showingDownloaded ? PANEL_HI : ACCENT);
+        Button downloaded = button("Downloaded", showingDownloaded ? BG : FG, showingDownloaded ? ACCENT : PANEL_HI);
+        apps.setTextSize(12); downloaded.setTextSize(12);
+        bar.addView(apps, new LinearLayout.LayoutParams(0, dp(48), 1));
+        LinearLayout.LayoutParams downloadedParams = new LinearLayout.LayoutParams(0, dp(48), 1);
+        downloadedParams.leftMargin = dp(8); bar.addView(downloaded, downloadedParams);
+        apps.setOnClickListener(v -> { if (showingDownloaded) { showingDownloaded = false; showHome(); } });
+        downloaded.setOnClickListener(v -> { if (!showingDownloaded) { showingDownloaded = true; showHome(); } });
+        root.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+    }
+
     private void showHome() {
         selected = null;
         showingSettings = false;
-        base("Apps");
+        base(showingDownloaded ? "Downloaded" : "Apps");
         LinearLayout titleRow = new LinearLayout(this); titleRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout titleCopy = new LinearLayout(this); titleCopy.setOrientation(LinearLayout.VERTICAL);
-        titleCopy.addView(text("Track and install apps", 14, MUTED, false));
+        titleCopy.addView(text(showingDownloaded ? "Apps installed from the catalog" : "Track and install apps", 14, MUTED, false));
         titleRow.addView(titleCopy, new LinearLayout.LayoutParams(0, -2, 1));
         Button addSource = button("Add source", FG, PANEL_HI); addSource.setTextSize(11);
         addSource.setMinHeight(dp(40)); titleRow.addView(addSource); addSource.setOnClickListener(v -> promptAddSource());
@@ -154,7 +170,7 @@ public class MainActivity extends Activity {
             filters.addView(chip, cp); chip.setOnClickListener(v -> { activeCategory = category; showHome(); });
         }
         filtersScroll.addView(filters); currentContent.addView(filtersScroll, bottom(dp(20)));
-        resultsLabel = text("Recommended apps  ·  " + visibleCount(), 11, MUTED, true);
+        resultsLabel = text((showingDownloaded ? "Downloaded apps" : "Recommended apps") + "  ·  " + visibleCount(), 11, MUTED, true);
         currentContent.addView(resultsLabel, bottom(dp(9)));
         listHost = new LinearLayout(this); listHost.setOrientation(LinearLayout.VERTICAL); currentContent.addView(listHost);
         refreshList();
@@ -164,6 +180,7 @@ public class MainActivity extends Activity {
         int count = 0;
         for (AppEntry app : catalog) {
             if (!showUnreviewedSources() && app.unlisted) continue;
+            if (showingDownloaded && !isInstalled(app)) continue;
             if (!activeCategory.equals("All") && !app.category.equalsIgnoreCase(activeCategory)) continue;
             String haystack = (app.name + " " + app.developer + " " + app.summary + " " + app.category).toLowerCase(Locale.ROOT);
             if (haystack.contains(query.toLowerCase(Locale.ROOT))) count++;
@@ -175,18 +192,22 @@ public class MainActivity extends Activity {
 
     private void refreshList() {
         if (listHost == null) return;
-        if (resultsLabel != null) resultsLabel.setText((activeCategory.equals("All") ? "Recommended apps" : activeCategory) + "  ·  " + visibleCount());
+        if (resultsLabel != null) resultsLabel.setText((showingDownloaded ? "Downloaded apps" : (activeCategory.equals("All") ? "Recommended apps" : activeCategory)) + "  ·  " + visibleCount());
         listHost.removeAllViews();
         int count = 0;
         for (AppEntry app : catalog) {
             if (!showUnreviewedSources() && app.unlisted) continue;
+            if (showingDownloaded && !isInstalled(app)) continue;
             if (!activeCategory.equals("All") && !app.category.equalsIgnoreCase(activeCategory)) continue;
             String haystack = (app.name + " " + app.developer + " " + app.summary + " " + app.category).toLowerCase(Locale.ROOT);
             if (!haystack.contains(query.toLowerCase(Locale.ROOT))) continue;
             listHost.addView(appRow(app)); count++;
         }
         if (count == 0) {
-            TextView empty = text(query.isEmpty() ? "No apps in this category." : "No matching apps.", 14, MUTED, false);
+            String emptyMessage = showingDownloaded
+                    ? (query.isEmpty() ? "No downloaded apps yet." : "No matching downloaded apps.")
+                    : (query.isEmpty() ? "No apps in this category." : "No matching apps.");
+            TextView empty = text(emptyMessage, 14, MUTED, false);
             empty.setPadding(dp(8), dp(24), dp(8), dp(24)); listHost.addView(empty);
         }
         else { View first = listHost.getChildAt(0); first.post(first::requestFocus); }
