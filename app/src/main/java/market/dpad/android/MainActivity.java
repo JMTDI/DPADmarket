@@ -51,6 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
+    private static final String MARKET_RELEASE_API = "https://api.github.com/repos/jbriones95/DPADmarket/releases/latest";
     private int BG, PANEL, PANEL_HI, RULE, FG, MUTED, ACCENT, POSITIVE, WARNING;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final List<AppEntry> catalog = new ArrayList<>();
@@ -61,6 +62,7 @@ public class MainActivity extends Activity {
     private AppEntry selected;
     private boolean showingSettings;
     private boolean darkTheme;
+    private boolean checkingMarketUpdate;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -225,11 +227,10 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "Android manages this permission on install.", Toast.LENGTH_SHORT).show();
             }
         });
+        settingRow("Check for DPAD Market updates", "Current version " + currentVersionName() + " · Check GitHub for the latest signed APK", this::checkForMarketUpdates);
 
         sectionLabel(currentContent, "About");
-        String version = "Unknown";
-        try { version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) { }
-        addMeta("Version", version);
+        addMeta("Version", currentVersionName());
         addMeta("Bundled catalog", catalog.size() - userSourceCount() + " curated apps");
         currentContent.addView(text("DPAD Market reads release metadata from GitHub and verifies published APK hashes before installation.", 13, MUTED, false), bottom(dp(12)));
     }
@@ -457,6 +458,71 @@ public class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private String currentVersionName() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+        catch (Exception ignored) { return "Unknown"; }
+    }
+
+    private void checkForMarketUpdates() {
+        if (checkingMarketUpdate) return;
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            Toast.makeText(this, "Allow installs for DPAD Market, then check for updates again.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        checkingMarketUpdate = true;
+        Toast.makeText(this, "Checking GitHub for DPAD Market updates…", Toast.LENGTH_SHORT).show();
+        io.execute(() -> {
+            try {
+                JSONObject release = getJson(MARKET_RELEASE_API);
+                String version = release.optString("tag_name", "").replaceFirst("^[vV]", "");
+                if (version.isEmpty()) throw new Exception("GitHub release has no version tag.");
+                JSONObject asset = findApkAsset(release);
+                if (asset == null) throw new Exception("The latest GitHub release has no APK asset.");
+                String apkUrl = asset.optString("browser_download_url", null);
+                if (apkUrl == null || apkUrl.isEmpty()) throw new Exception("The release APK has no download URL.");
+                long size = asset.optLong("size", -1);
+                if (size > 350L * 1024 * 1024) throw new Exception("DPAD Market APK exceeds the 350 MB safety limit.");
+
+                String currentVersion = currentVersionName();
+                int versionComparison = compareVersions(version, currentVersion);
+                if (versionComparison <= 0) {
+                    String status = versionComparison == 0
+                            ? "DPAD Market is up to date (v" + currentVersion + ")."
+                            : "Installed v" + currentVersion + " is newer than the latest release (v" + version + ").";
+                    runOnUiThread(() -> Toast.makeText(this, status, Toast.LENGTH_LONG).show());
+                    return;
+                }
+
+                AppEntry market = new AppEntry();
+                market.name = "DPAD Market";
+                market.packageId = getPackageName();
+                installFromUrl(market, apkUrl, version, asset.optString("digest", ""), size);
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Could not check for DPAD Market updates: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            } finally {
+                runOnUiThread(() -> checkingMarketUpdate = false);
+            }
+        });
+    }
+
+    private int compareVersions(String candidate, String current) {
+        String[] candidateParts = candidate.split("[.+-]", 2)[0].split("\\.");
+        String[] currentParts = current.split("[.+-]", 2)[0].replaceFirst("^[vV]", "").split("\\.");
+        int count = Math.max(candidateParts.length, currentParts.length);
+        for (int i = 0; i < count; i++) {
+            long candidatePart = i < candidateParts.length ? parseVersionPart(candidateParts[i]) : 0;
+            long currentPart = i < currentParts.length ? parseVersionPart(currentParts[i]) : 0;
+            if (candidatePart != currentPart) return Long.compare(candidatePart, currentPart);
+        }
+        return 0;
+    }
+
+    private long parseVersionPart(String part) {
+        try { return Long.parseLong(part.replaceFirst("[^0-9].*$", "")); }
+        catch (Exception ignored) { return 0; }
     }
 
     private boolean isInstalled(AppEntry app) {

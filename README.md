@@ -17,6 +17,8 @@ Download the latest signed APK from [GitHub Releases](https://github.com/jbrione
 
 Releases are built and signed by GitHub Actions. Each release includes a SHA-256 checksum, and GitHub build provenance is attached to the APK. The Android signing key is held as repository Actions secrets and must be preserved for future app updates to install over existing copies.
 
+You can check for and install DPAD Market updates from **Settings → Check for DPAD Market updates**.
+
 ## Build
 
 With Android SDK platform 36 and JDK 17 or newer:
@@ -44,3 +46,7 @@ The app currently reads curated metadata bundled in the APK, then checks the lin
 - The download is served by GitHub over HTTPS and passed to Android's package installer.
 - Android handles install confirmation and signing-certificate compatibility with any already-installed copy.
 - Release hashes are not pinned yet, and the curated source list is not a code audit. The interface calls this out instead of implying verification.
+
+## License
+
+DPAD Market is licensed under the [MIT License](LICENSE).
