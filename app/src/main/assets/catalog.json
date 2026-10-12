@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "catalogName": "DPAD Market",
+  "apps": [
+    {
+      "id": "key-mapper",
+      "packageId": "io.github.sds100.keymapper",
+      "name": "Key Mapper",
+      "developer": "Key Mapper",
+      "repository": "https://github.com/keymapperorg/KeyMapper",
+      "releaseApi": "https://api.github.com/repos/keymapperorg/KeyMapper/releases/latest",
+      "category": "Tools",
+      "summary": "Remap hardware buttons and key combinations.",
+      "curatorNote": "A useful companion for configuring hardware controls. It needs accessibility permissions for some remapping features.",
+      "license": "GPL-3.0-or-later",
+      "platform": "Android",
+      "inputSupport": "Button remapping tool"
+    },
+    {
+      "id": "auxio",
+      "packageId": "org.oxycblt.auxio",
+      "name": "Auxio",
+      "developer": "OxygenCobalt",
+      "repository": "https://github.com/OxygenCobalt/Auxio",
+      "releaseApi": "https://api.github.com/repos/OxygenCobalt/Auxio/releases/latest",
+      "category": "Audio",
+      "summary": "A local music player for Android.",
+      "curatorNote": "A focused local music player. Physical media keys help; full D-pad navigation still needs device testing.",
+      "license": "GPL-3.0-or-later",
+      "platform": "Android",
+      "inputSupport": "Media keys; D-pad needs testing"
+    },
+    {
+      "id": "organic-maps",
+      "packageId": "app.organicmaps",
+      "name": "Organic Maps",
+      "developer": "Organic Maps",
+      "repository": "https://github.com/organicmaps/organicmaps",
+      "releaseApi": "https://api.github.com/repos/organicmaps/organicmaps/releases/latest",
+      "category": "Maps",
+      "summary": "Offline maps and navigation.",
+      "curatorNote": "Open-source offline mapping with APK releases on GitHub. D-pad suitability depends on task and device.",
+      "license": "NOASSERTION · check upstream",
+      "platform": "Android",
+      "inputSupport": "Needs device testing"
+    },
+    {
+      "id": "fossify-gallery",
+      "packageId": "org.fossify.gallery",
+      "name": "Fossify Gallery",
+      "developer": "Fossify",
+      "repository": "https://github.com/FossifyOrg/Gallery",
+      "releaseApi": "https://api.github.com/repos/FossifyOrg/Gallery/releases/latest",
+      "category": "Media",
+      "summary": "A private, open-source photo gallery.",
+      "curatorNote": "A straightforward gallery with upstream APK releases. Check focus behavior on your device before relying on it without touch.",
+      "license": "GPL-3.0-or-later",
+      "platform": "Android",
+      "inputSupport": "Needs device testing"
+    },
+    {
+      "id": "newpipe",
+      "packageId": "org.schabi.newpipe",
+      "name": "NewPipe",
+      "developer": "Team NewPipe",
+      "repository": "https://github.com/TeamNewPipe/NewPipe",
+      "releaseApi": "https://api.github.com/repos/TeamNewPipe/NewPipe/releases/latest",
+      "category": "Media",
+      "summary": "A lightweight, open-source media player.",
+      "curatorNote": "A popular open-source media app with direct APK releases. Navigation support varies by screen; test before recommending for D-pad-only use.",
+      "license": "GPL-3.0-or-later",
+      "platform": "Android",
+      "inputSupport": "Needs device testing"
+    },
+    {
+      "id": "kvaesitso",
+      "packageId": "de.mm20.launcher2",
+      "name": "Kvaesitso",
+      "developer": "MM2-0",
+      "repository": "https://github.com/MM2-0/Kvaesitso",
+      "releaseApi": "https://api.github.com/repos/MM2-0/Kvaesitso/releases/latest",
+      "category": "Tools",
+      "summary": "A search-first Android launcher.",
+      "curatorNote": "A keyboard-friendly launcher concept with public GitHub APK releases. Check D-pad operation and launcher compatibility on your device.",
+      "license": "GPL-3.0-or-later",
+      "platform": "Android",
+      "inputSupport": "Keyboard-friendly; D-pad needs testing"
+    }
+  ]
+}
