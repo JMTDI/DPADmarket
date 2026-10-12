@@ -127,17 +127,36 @@ public class MainActivity extends Activity {
     private LinearLayout currentContent;
 
     private void addBottomBar() {
-        LinearLayout bar = new LinearLayout(this); bar.setPadding(dp(12), dp(8), dp(12), dp(10));
+        View rule = new View(this); rule.setBackgroundColor(RULE);
+        root.addView(rule, new LinearLayout.LayoutParams(-1, dp(1)));
+        LinearLayout bar = new LinearLayout(this); bar.setGravity(Gravity.CENTER); bar.setPadding(dp(12), dp(7), dp(12), dp(9));
         bar.setBackgroundColor(PANEL);
-        Button apps = button("Apps", showingDownloaded ? FG : BG, showingDownloaded ? PANEL_HI : ACCENT);
-        Button downloaded = button("Downloaded", showingDownloaded ? BG : FG, showingDownloaded ? ACCENT : PANEL_HI);
-        apps.setTextSize(12); downloaded.setTextSize(12);
-        bar.addView(apps, new LinearLayout.LayoutParams(0, dp(48), 1));
-        LinearLayout.LayoutParams downloadedParams = new LinearLayout.LayoutParams(0, dp(48), 1);
+        LinearLayout apps = navItem("▦", "Apps", !showingDownloaded, () -> {
+            if (showingDownloaded) { showingDownloaded = false; showHome(); }
+        });
+        LinearLayout downloaded = navItem("↓", "Downloaded", showingDownloaded, () -> {
+            if (!showingDownloaded) { showingDownloaded = true; showHome(); }
+        });
+        bar.addView(apps, new LinearLayout.LayoutParams(0, dp(62), 1));
+        LinearLayout.LayoutParams downloadedParams = new LinearLayout.LayoutParams(0, dp(62), 1);
         downloadedParams.leftMargin = dp(8); bar.addView(downloaded, downloadedParams);
-        apps.setOnClickListener(v -> { if (showingDownloaded) { showingDownloaded = false; showHome(); } });
-        downloaded.setOnClickListener(v -> { if (!showingDownloaded) { showingDownloaded = true; showHome(); } });
         root.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private LinearLayout navItem(String symbol, String label, boolean selected, Runnable action) {
+        int color = selected ? POSITIVE : MUTED;
+        LinearLayout item = new LinearLayout(this); item.setOrientation(LinearLayout.VERTICAL); item.setGravity(Gravity.CENTER);
+        item.setFocusable(true); item.setClickable(true); item.setPadding(dp(8), dp(4), dp(8), dp(4));
+        item.setBackground(selectable(selected ? PANEL_HI : PANEL));
+        TextView icon = text(symbol, 21, color, true); icon.setGravity(Gravity.CENTER); item.addView(icon);
+        TextView title = text(label, 11, color, selected); title.setGravity(Gravity.CENTER); title.setPadding(0, dp(2), 0, 0); item.addView(title);
+        item.setOnClickListener(v -> action.run()); item.setOnKeyListener((v, key, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_UP && (key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER)) {
+                action.run(); return true;
+            }
+            return false;
+        });
+        return item;
     }
 
     private void showHome() {
