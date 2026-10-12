@@ -9,11 +9,13 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageInstaller;
 import android.graphics.Canvas;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Base64;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -43,12 +45,16 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
     private static final String MARKET_RELEASE_API = "https://api.github.com/repos/jbriones95/DPADmarket/releases/latest";
@@ -324,6 +330,119 @@ public class MainActivity extends Activity {
         safety.setPadding(0, dp(15), 0, dp(12)); currentContent.addView(safety, bottom(dp(8)));
         Button source = button("View source repository", FG, PANEL_HI); currentContent.addView(source);
         source.setOnClickListener(v -> openUrl(app.repository));
+
+        LinearLayout screenshots = new LinearLayout(this); screenshots.setOrientation(LinearLayout.VERTICAL);
+        currentContent.addView(screenshots, bottom(dp(18)));
+        loadScreenshots(app, screenshots);
+    }
+
+    private void loadScreenshots(AppEntry app, LinearLayout section) {
+        section.addView(text("Screenshots", 10, ACCENT, true), bottom(dp(8)));
+        TextView loading = text("Loading screenshots from the repository…", 12, MUTED, false);
+        section.addView(loading, bottom(dp(8)));
+        io.execute(() -> {
+            List<Screenshot> screenshots = new ArrayList<>();
+            try {
+                String[] repositoryParts = repositoryParts(app.repository);
+                JSONObject repositoryInfo = getJson("https://api.github.com/repos/" + repositoryParts[0] + "/" + repositoryParts[1]);
+                String branch = repositoryInfo.optString("default_branch", "main");
+                String readmeAddress = "https://api.github.com/repos/" + repositoryParts[0] + "/" + repositoryParts[1] + "/readme";
+                JSONObject readme = getJson(readmeAddress);
+                String content = new String(Base64.decode(readme.optString("content", "").replaceAll("\\s", ""), Base64.DEFAULT), StandardCharsets.UTF_8);
+                String rawReadme = "https://raw.githubusercontent.com/" + repositoryParts[0] + "/" + repositoryParts[1] + "/" + branch + "/README.md";
+                screenshots.addAll(findScreenshots(content, rawReadme));
+                if (screenshots.isEmpty()) screenshots.addAll(findRepositoryImages(repositoryParts, branch));
+            } catch (Exception ignored) { }
+            runOnUiThread(() -> {
+                if (section.getParent() == null) return;
+                section.removeAllViews();
+                if (screenshots.isEmpty()) {
+                    section.setVisibility(View.GONE);
+                } else {
+                    section.addView(text("Screenshots", 10, ACCENT, true), bottom(dp(8)));
+                    HorizontalScrollView scroll = new HorizontalScrollView(this);
+                    scroll.setHorizontalScrollBarEnabled(false);
+                    LinearLayout images = new LinearLayout(this); images.setGravity(Gravity.CENTER_VERTICAL);
+                    for (Screenshot screenshot : screenshots) addScreenshot(images, screenshot);
+                    scroll.addView(images); section.addView(scroll, new LinearLayout.LayoutParams(-1, dp(260)));
+                }
+            });
+        });
+    }
+
+    private List<Screenshot> findScreenshots(String readme, String rawReadme) {
+        List<Screenshot> result = new ArrayList<>(); Set<String> seen = new HashSet<>();
+        Pattern markdown = Pattern.compile("!\\[([^]]*)\\]\\(([^)\\s]+)", Pattern.CASE_INSENSITIVE);
+        Matcher markdownMatcher = markdown.matcher(readme);
+        while (markdownMatcher.find() && result.size() < 12) addScreenshotReference(result, seen, markdownMatcher.group(2), markdownMatcher.group(1), rawReadme);
+        Pattern html = Pattern.compile("<img[^>]+src\\s*=\\s*[\\\"']([^\\\"']+)[\\\"'][^>]*>", Pattern.CASE_INSENSITIVE);
+        Matcher htmlMatcher = html.matcher(readme);
+        while (htmlMatcher.find() && result.size() < 12) addScreenshotReference(result, seen, htmlMatcher.group(1), "Repository screenshot", rawReadme);
+        return result;
+    }
+
+    private List<Screenshot> findRepositoryImages(String[] repositoryParts, String branch) throws Exception {
+        List<Screenshot> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        JSONObject treeResponse = getJson("https://api.github.com/repos/" + repositoryParts[0] + "/" + repositoryParts[1] + "/git/trees/" + branch + "?recursive=1");
+        JSONArray tree = treeResponse.optJSONArray("tree");
+        if (tree == null) return result;
+        for (int i = 0; i < tree.length() && result.size() < 12; i++) {
+            JSONObject item = tree.optJSONObject(i); if (item == null || !"blob".equals(item.optString("type"))) continue;
+            String path = item.optString("path", ""); String lower = path.toLowerCase(Locale.ROOT);
+            if (!lower.matches(".*\\.(png|jpe?g|webp|gif)$") || !lower.matches(".*(screenshot|screen|mockup|screenshots).*")) continue;
+            String address = "https://raw.githubusercontent.com/" + repositoryParts[0] + "/" + repositoryParts[1] + "/" + branch + "/" + path;
+            if (seen.add(address)) result.add(new Screenshot(address, path.substring(path.lastIndexOf('/') + 1)));
+        }
+        return result;
+    }
+
+    private void addScreenshotReference(List<Screenshot> result, Set<String> seen, String reference, String alt, String rawReadme) {
+        try {
+            String address = new URL(new URL(rawReadme), reference.replace("&amp;", "&")).toString();
+            String lower = address.toLowerCase(Locale.ROOT);
+            if (!(lower.contains("user-attachments") || lower.matches(".*\\.(png|jpe?g|webp|gif)(\\?.*)?$"))) return;
+            if (seen.add(address)) result.add(new Screenshot(address, alt == null || alt.isEmpty() ? "Repository screenshot" : alt));
+        } catch (Exception ignored) { }
+    }
+
+    private void addScreenshot(LinearLayout parent, Screenshot screenshot) {
+        ImageView image = new ImageView(this); image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        image.setBackground(rounded(PANEL, dp(18), RULE)); image.setPadding(dp(6), dp(6), dp(6), dp(6));
+        image.setContentDescription(screenshot.alt); image.setFocusable(true); image.setClickable(true);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(180), dp(250)); params.setMargins(0, 0, dp(10), 0);
+        parent.addView(image, params); image.setOnClickListener(v -> openUrl(screenshot.address));
+        io.execute(() -> {
+            try {
+                Bitmap bitmap = downloadScreenshot(screenshot.address);
+                if (bitmap != null) runOnUiThread(() -> { if (image.getParent() != null) image.setImageBitmap(bitmap); });
+            } catch (Exception ignored) { }
+        });
+    }
+
+    private Bitmap downloadScreenshot(String address) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
+        connection.setConnectTimeout(15000); connection.setReadTimeout(20000);
+        connection.setRequestProperty("User-Agent", "DPAD-Market-Android"); connection.connect();
+        if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) throw new Exception("Screenshot request failed");
+        try (InputStream input = new BufferedInputStream(connection.getInputStream()); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192]; int count; long total = 0;
+            while ((count = input.read(buffer)) != -1) {
+                total += count; if (total > 12L * 1024 * 1024) throw new Exception("Screenshot is too large");
+                output.write(buffer, 0, count);
+            }
+            byte[] bytes = output.toByteArray(); BitmapFactory.Options bounds = new BitmapFactory.Options(); bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+            BitmapFactory.Options options = new BitmapFactory.Options(); options.inSampleSize = 1;
+            while (bounds.outWidth / options.inSampleSize > dp(360) || bounds.outHeight / options.inSampleSize > dp(500)) options.inSampleSize *= 2;
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+        } finally { connection.disconnect(); }
+    }
+
+    private String[] repositoryParts(String repository) throws Exception {
+        List<String> parts = Uri.parse(repository).getPathSegments();
+        if (parts.size() < 2) throw new Exception("Invalid repository URL");
+        return new String[]{parts.get(0), parts.get(1)};
     }
 
     private void fetchLatest(AppEntry app, TextView target) {
@@ -723,6 +842,10 @@ public class MainActivity extends Activity {
         Canvas canvas = new Canvas(bitmap);
         drawable.setBounds(0, 0, width, height); drawable.draw(canvas);
         return bitmap;
+    }
+    static class Screenshot {
+        final String address, alt;
+        Screenshot(String address, String alt) { this.address = address; this.alt = alt; }
     }
     private LinearLayout.LayoutParams bottom(int margin) { LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2); p.bottomMargin = margin; return p; }
     private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }

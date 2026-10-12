@@ -141,6 +141,48 @@
       "license": "GPL-3.0",
       "platform": "Android",
       "inputSupport": "D-pad compatible · full keypad support"
+    },
+    {
+      "id": "matchat",
+      "packageId": "org.matchat.client",
+      "name": "MatChat",
+      "developer": "UncleAndy123",
+      "repository": "https://github.com/UncleAndy123/MatChat",
+      "releaseApi": "https://api.github.com/repos/UncleAndy123/MatChat/releases/latest",
+      "category": "Community",
+      "summary": "End-to-end encrypted Matrix messaging for D-pad feature phones.",
+      "curatorNote": "A D-pad-first Matrix client for locked-down Android feature phones.",
+      "license": "GPL-2.0",
+      "platform": "Android",
+      "inputSupport": "D-pad supported"
+    },
+    {
+      "id": "flip2calendar",
+      "packageId": "com.evdeman.flip2calendar",
+      "name": "FlipCalendar",
+      "developer": "jevdemon",
+      "repository": "https://github.com/jevdemon/flip2calendar",
+      "releaseApi": "https://api.github.com/repos/jevdemon/flip2calendar/releases/latest",
+      "category": "Tools",
+      "summary": "A D-pad calendar for de-Googled flip phones.",
+      "curatorNote": "A native calendar that syncs with Google Calendar without Google Play Services.",
+      "license": "MIT",
+      "platform": "Android",
+      "inputSupport": "D-pad supported"
+    },
+    {
+      "id": "novalox",
+      "packageId": "io.github.theonionsarewatching.nova",
+      "name": "NovaLox",
+      "developer": "theOnionsAreWatching",
+      "repository": "https://github.com/theOnionsAreWatching/NovaLox",
+      "releaseApi": "https://api.github.com/repos/theOnionsAreWatching/NovaLox/releases/latest",
+      "category": "Communication",
+      "summary": "D-pad messaging with SMS and MMS support for keypad phones.",
+      "curatorNote": "A privacy-focused messaging app designed for flip phones and physical-key operation.",
+      "license": "PolyForm Noncommercial 1.0.0",
+      "platform": "Android",
+      "inputSupport": "D-pad supported"
     }
   ]
 }
