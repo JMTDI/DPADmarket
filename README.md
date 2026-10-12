@@ -2,6 +2,15 @@
 
 An Android app catalog for button-first devices. DPAD Market curates listings, reads the latest release metadata from each developer's GitHub repository, and lets Android's package installer handle installation and confirmation.
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/home.png" width="200" alt="DPAD Market app catalog in the light theme" />
+  <img src="screenshots/home-dark.png" width="200" alt="DPAD Market app catalog in the dark theme" />
+  <img src="screenshots/settings.png" width="200" alt="DPAD Market settings in the light theme" />
+  <img src="screenshots/settings-dark.png" width="200" alt="DPAD Market settings in the dark theme" />
+</p>
+
 ## Download
 
 Download the latest signed APK from [GitHub Releases](https://github.com/jbriones95/DPADmarket/releases/latest). On Android, open the downloaded APK and confirm installation. You may need to allow installs from your browser or file manager in Android settings.
