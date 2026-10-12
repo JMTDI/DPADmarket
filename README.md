@@ -2,6 +2,12 @@
 
 An Android app catalog for button-first devices. DPAD Market curates listings, reads the latest release metadata from each developer's GitHub repository, and lets Android's package installer handle installation and confirmation.
 
+## Download
+
+Download the latest signed APK from [GitHub Releases](https://github.com/jbriones95/DPADmarket/releases/latest). On Android, open the downloaded APK and confirm installation. You may need to allow installs from your browser or file manager in Android settings.
+
+Releases are built and signed by GitHub Actions. Each release includes a SHA-256 checksum, and GitHub build provenance is attached to the APK. The Android signing key is held as repository Actions secrets and must be preserved for future app updates to install over existing copies.
+
 ## Build
 
 With Android SDK platform 36 and JDK 17 or newer:
@@ -11,6 +17,8 @@ With Android SDK platform 36 and JDK 17 or newer:
 ```
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+
+Release builds require `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` environment variables. The public release workflow supplies these from GitHub Actions secrets.
 
 ## Catalog entries
 

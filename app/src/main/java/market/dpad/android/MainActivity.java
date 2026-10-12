@@ -3,10 +3,13 @@ package market.dpad.android;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageInstaller;
-import android.content.SharedPreferences;
+import android.graphics.Canvas;
+import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
@@ -20,6 +23,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -30,6 +34,8 @@ import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -37,29 +43,46 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
-    private static final int BG = 0xff111315, PANEL = 0xff191c1f, PANEL_HI = 0xff24292c;
-    private static final int RULE = 0xff34393d, FG = 0xffe9ece9, MUTED = 0xff9aa1a2;
-    private static final int LIME = 0xffd8ed63, ORANGE = 0xfff47a45, BLUE = 0xff91cfff;
+    private int BG, PANEL, PANEL_HI, RULE, FG, MUTED, ACCENT, POSITIVE, WARNING;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final List<AppEntry> catalog = new ArrayList<>();
+    private final Map<String, Bitmap> iconCache = new HashMap<>();
     private LinearLayout root;
     private String activeCategory = "All";
     private String query = "";
     private AppEntry selected;
+    private boolean showingSettings;
+    private boolean darkTheme;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        darkTheme = getPreferences(MODE_PRIVATE).getBoolean("dark_theme", false);
+        applyThemeColors();
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         getWindow().getDecorView().setSystemUiVisibility(0);
         loadCatalog();
         showHome();
+    }
+
+    private void applyThemeColors() {
+        if (darkTheme) {
+            BG = 0xff101010; PANEL = 0xff1c1c1c; PANEL_HI = 0xff303030;
+            RULE = 0xff454545; FG = 0xfff2f2f2; MUTED = 0xffb0b0b0;
+            ACCENT = 0xffeeeeee; POSITIVE = 0xffb8d8b8; WARNING = 0xffffc27a;
+        } else {
+            BG = 0xffffffff; PANEL = 0xfff2f2f2; PANEL_HI = 0xffe5e5e5;
+            RULE = 0xffd0d0d0; FG = 0xff171717; MUTED = 0xff626262;
+            ACCENT = 0xff303030; POSITIVE = 0xff276238; WARNING = 0xff9a4b00;
+        }
     }
 
     private void loadCatalog() {
@@ -76,13 +99,15 @@ public class MainActivity extends Activity {
 
     private void base(String title) {
         root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG);
-        TextView brand = text("+  DPAD MARKET", 17, LIME, true);
-        brand.setPadding(dp(22), dp(17), dp(18), dp(16)); brand.setBackgroundColor(BG);
-        brand.setFocusable(false);
-        root.addView(brand, new LinearLayout.LayoutParams(-1, -2));
-        TextView bar = text(title.toUpperCase(Locale.ROOT) + "     ·     " + catalog.size() + " APPS", 11, MUTED, true);
-        bar.setPadding(dp(22), dp(11), dp(18), dp(11)); bar.setBackgroundColor(PANEL);
-        root.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout appBar = new LinearLayout(this); appBar.setGravity(Gravity.CENTER_VERTICAL);
+        appBar.setPadding(dp(20), dp(15), dp(16), dp(8)); appBar.setBackgroundColor(BG);
+        LinearLayout titleBlock = new LinearLayout(this); titleBlock.setOrientation(LinearLayout.VERTICAL);
+        titleBlock.addView(text("DPAD Market", 24, FG, false));
+        titleBlock.addView(text(title, 13, MUTED, false));
+        appBar.addView(titleBlock, new LinearLayout.LayoutParams(0, -2, 1));
+        Button settings = button("Settings", FG, PANEL_HI); settings.setTextSize(11); settings.setMinHeight(dp(40));
+        appBar.addView(settings); settings.setOnClickListener(v -> showSettings());
+        root.addView(appBar, new LinearLayout.LayoutParams(-1, -2));
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(20), dp(20), dp(20), dp(32));
@@ -92,19 +117,20 @@ public class MainActivity extends Activity {
     private LinearLayout currentContent;
 
     private void showHome() {
-        base("EXPLORE");
+        selected = null;
+        showingSettings = false;
+        base("Apps");
         LinearLayout titleRow = new LinearLayout(this); titleRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout titleCopy = new LinearLayout(this); titleCopy.setOrientation(LinearLayout.VERTICAL);
-        titleCopy.addView(text("Apps", 27, FG, true));
-        titleCopy.addView(text("Curated for button-first Android", 12, MUTED, false));
+        titleCopy.addView(text("Track and install apps", 14, MUTED, false));
         titleRow.addView(titleCopy, new LinearLayout.LayoutParams(0, -2, 1));
-        Button addSource = button("+  ADD SOURCE", BG, LIME); addSource.setTextSize(10);
+        Button addSource = button("Add source", FG, PANEL_HI); addSource.setTextSize(11);
         addSource.setMinHeight(dp(40)); titleRow.addView(addSource); addSource.setOnClickListener(v -> promptAddSource());
         currentContent.addView(titleRow, bottom(dp(18)));
 
         EditText search = new EditText(this); search.setSingleLine(true); search.setTextSize(14); search.setTextColor(FG);
-        search.setHintTextColor(MUTED); search.setHint("⌕   Search apps and developers"); search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        search.setPadding(dp(13), dp(4), dp(13), dp(4)); search.setBackgroundColor(PANEL);
+        search.setHintTextColor(MUTED); search.setHint("Search apps and developers"); search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        search.setPadding(dp(22), dp(4), dp(22), dp(4)); search.setBackground(rounded(PANEL, dp(30), 0));
         search.setText(query); currentContent.addView(search, bottom(dp(12)));
         search.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
@@ -114,13 +140,13 @@ public class MainActivity extends Activity {
         HorizontalScrollView filtersScroll = new HorizontalScrollView(this); filtersScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout filters = new LinearLayout(this); filters.setOrientation(LinearLayout.HORIZONTAL);
         for (String category : new String[]{"All", "Media", "Audio", "Tools", "Maps", "Community"}) {
-            Button chip = button(category, category.equals(activeCategory) ? BG : FG, category.equals(activeCategory) ? LIME : PANEL_HI);
+            Button chip = button(category, category.equals(activeCategory) ? BG : FG, category.equals(activeCategory) ? ACCENT : PANEL_HI);
             chip.setTextSize(12); chip.setMinHeight(0); chip.setMinimumHeight(0);
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, dp(42)); cp.setMargins(0, 0, dp(7), 0);
             filters.addView(chip, cp); chip.setOnClickListener(v -> { activeCategory = category; showHome(); });
         }
         filtersScroll.addView(filters); currentContent.addView(filtersScroll, bottom(dp(20)));
-        resultsLabel = text("CURATOR PICKS  ·  " + visibleCount() + " APPS", 10, MUTED, true);
+        resultsLabel = text("Recommended apps  ·  " + visibleCount(), 11, MUTED, true);
         currentContent.addView(resultsLabel, bottom(dp(9)));
         listHost = new LinearLayout(this); listHost.setOrientation(LinearLayout.VERTICAL); currentContent.addView(listHost);
         refreshList();
@@ -129,6 +155,7 @@ public class MainActivity extends Activity {
     private int visibleCount() {
         int count = 0;
         for (AppEntry app : catalog) {
+            if (!showUnreviewedSources() && app.unlisted) continue;
             if (!activeCategory.equals("All") && !app.category.equalsIgnoreCase(activeCategory)) continue;
             String haystack = (app.name + " " + app.developer + " " + app.summary + " " + app.category).toLowerCase(Locale.ROOT);
             if (haystack.contains(query.toLowerCase(Locale.ROOT))) count++;
@@ -140,69 +167,156 @@ public class MainActivity extends Activity {
 
     private void refreshList() {
         if (listHost == null) return;
-        if (resultsLabel != null) resultsLabel.setText((activeCategory.equals("All") ? "CURATOR PICKS" : activeCategory.toUpperCase(Locale.ROOT)) + "  ·  " + visibleCount() + " APPS");
+        if (resultsLabel != null) resultsLabel.setText((activeCategory.equals("All") ? "Recommended apps" : activeCategory) + "  ·  " + visibleCount());
         listHost.removeAllViews();
         int count = 0;
         for (AppEntry app : catalog) {
+            if (!showUnreviewedSources() && app.unlisted) continue;
             if (!activeCategory.equals("All") && !app.category.equalsIgnoreCase(activeCategory)) continue;
             String haystack = (app.name + " " + app.developer + " " + app.summary + " " + app.category).toLowerCase(Locale.ROOT);
             if (!haystack.contains(query.toLowerCase(Locale.ROOT))) continue;
             listHost.addView(appRow(app)); count++;
         }
-        if (count == 0) listHost.addView(text("No matching apps.", 14, MUTED, false));
+        if (count == 0) {
+            TextView empty = text(query.isEmpty() ? "No apps in this category." : "No matching apps.", 14, MUTED, false);
+            empty.setPadding(dp(8), dp(24), dp(8), dp(24)); listHost.addView(empty);
+        }
         else { View first = listHost.getChildAt(0); first.post(first::requestFocus); }
+    }
+
+    private boolean showUnreviewedSources() {
+        return getPreferences(MODE_PRIVATE).getBoolean("show_unreviewed_sources", true);
+    }
+
+    private void showSettings() {
+        selected = null; showingSettings = true; base("Settings");
+        addBack(currentContent, "Back to apps");
+
+        sectionLabel(currentContent, "Appearance");
+        settingRow("Dark theme", darkTheme ? "On · use a dark monochrome theme" : "Off · use a light monochrome theme", () -> {
+            darkTheme = !darkTheme;
+            getPreferences(MODE_PRIVATE).edit().putBoolean("dark_theme", darkTheme).apply();
+            applyThemeColors();
+            getWindow().setStatusBarColor(BG);
+            getWindow().setNavigationBarColor(BG);
+            showSettings();
+        });
+
+        sectionLabel(currentContent, "Catalog");
+        settingRow("Show unreviewed sources", showUnreviewedSources() ? "On  ·  User-added GitHub sources appear in the catalog" : "Off  ·  Hide user-added GitHub sources", () -> {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("show_unreviewed_sources", !showUnreviewedSources()).apply();
+            showSettings();
+        });
+        settingRow("Remove added sources", userSourceCount() == 0 ? "No user-added sources on this device" : userSourceCount() + " user-added source" + (userSourceCount() == 1 ? "" : "s") + "  ·  Select to remove all", () -> {
+            if (userSourceCount() == 0) return;
+            new AlertDialog.Builder(this)
+                    .setTitle("Remove added sources?")
+                    .setMessage("This removes only sources you added from the device. Bundled apps stay in DPAD Market.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Remove", (dialog, which) -> clearUserSources())
+                    .show();
+        });
+
+        sectionLabel(currentContent, "Installation");
+        settingRow("Install permissions", "Manage whether DPAD Market can hand APKs to Android", () -> {
+            if (Build.VERSION.SDK_INT >= 26) {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            } else {
+                Toast.makeText(this, "Android manages this permission on install.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        sectionLabel(currentContent, "About");
+        String version = "Unknown";
+        try { version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) { }
+        addMeta("Version", version);
+        addMeta("Bundled catalog", catalog.size() - userSourceCount() + " curated apps");
+        currentContent.addView(text("DPAD Market reads release metadata from GitHub and verifies published APK hashes before installation.", 13, MUTED, false), bottom(dp(12)));
+    }
+
+    private int userSourceCount() {
+        int count = 0;
+        for (AppEntry app : catalog) if (app.unlisted) count++;
+        return count;
+    }
+
+    private void clearUserSources() {
+        for (int i = catalog.size() - 1; i >= 0; i--) if (catalog.get(i).unlisted) catalog.remove(i);
+        saveUserSources(); showHome(); Toast.makeText(this, "Added sources removed.", Toast.LENGTH_SHORT).show();
+    }
+
+    private void settingRow(String title, String summary, final Runnable action) {
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL); row.setFocusable(true); row.setClickable(true);
+        row.setBackground(selectable()); row.setPadding(dp(16), dp(13), dp(16), dp(13));
+        row.addView(text(title, 16, FG, true));
+        TextView detail = text(summary, 12, MUTED, false); detail.setPadding(0, dp(4), 0, 0); row.addView(detail);
+        row.setOnClickListener(v -> action.run()); row.setOnKeyListener((v, key, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_UP && (key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER)) { action.run(); return true; }
+            return false;
+        });
+        currentContent.addView(row, bottom(dp(9)));
     }
 
     private View appRow(AppEntry app) {
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL);
-        row.setFocusable(true); row.setClickable(true); row.setBackground(selectable()); row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setFocusable(true); row.setClickable(true); row.setBackground(selectable()); row.setPadding(dp(16), dp(14), dp(16), dp(14));
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2); rowParams.bottomMargin = dp(10);
         LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL);
-        TextView mark = text(app.name.substring(0, 1).toUpperCase(Locale.ROOT), 17, LIME, true);
-        mark.setGravity(Gravity.CENTER); mark.setBackgroundColor(PANEL_HI);
-        top.addView(mark, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        TextView mark = text(app.name.substring(0, 1).toUpperCase(Locale.ROOT), 19, ACCENT, true);
+        mark.setGravity(Gravity.CENTER); mark.setBackground(rounded(PANEL_HI, dp(28), 0));
+        ImageView icon = new ImageView(this); icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        icon.setBackground(rounded(PANEL_HI, dp(28), 0)); icon.setVisibility(View.GONE);
+        android.widget.FrameLayout iconFrame = new android.widget.FrameLayout(this);
+        iconFrame.addView(mark, new android.widget.FrameLayout.LayoutParams(dp(48), dp(48)));
+        iconFrame.addView(icon, new android.widget.FrameLayout.LayoutParams(dp(48), dp(48)));
+        top.addView(iconFrame, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        loadIcon(app, icon, mark);
         LinearLayout names = new LinearLayout(this); names.setOrientation(LinearLayout.VERTICAL); names.setPadding(dp(12), 0, 0, 0);
-        names.addView(text(app.name, 15, FG, true)); names.addView(text(app.developer + "  ·  " + app.category, 10, MUTED, false));
+        names.addView(text(app.name, 18, FG, false)); names.addView(text("By " + app.developer, 13, MUTED, false));
         top.addView(names, new LinearLayout.LayoutParams(0, -2, 1));
-        top.addView(text("›", 27, ORANGE, false)); row.addView(top);
-        TextView summary = text(app.summary, 12, MUTED, false); summary.setMaxLines(2); summary.setPadding(dp(54), dp(6), 0, dp(3)); row.addView(summary);
-        TextView status = text((app.unlisted ? "UNLISTED SOURCE" : "D-PAD  ·  " + app.inputSupport).toUpperCase(Locale.ROOT), 9,
-                app.unlisted ? ORANGE : (app.inputSupport.contains("TV") ? LIME : ORANGE), true);
-        status.setPadding(dp(54), 0, 0, 0); row.addView(status);
+        TextView source = text(app.unlisted ? "Local" : "GitHub", 12, MUTED, false); source.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(source); row.addView(top);
+        TextView summary = text(app.summary, 12, MUTED, false); summary.setMaxLines(2); summary.setPadding(dp(60), dp(8), 0, dp(5)); row.addView(summary);
+        TextView status = text(app.unlisted ? "Unlisted source" : "D-pad: " + app.inputSupport, 10,
+                app.unlisted ? WARNING : POSITIVE, true);
+        status.setPadding(dp(60), 0, 0, 0); row.addView(status);
         row.setOnClickListener(v -> showDetail(app)); row.setOnKeyListener((v, key, event) -> {
             if (event.getAction() == KeyEvent.ACTION_UP && (key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER)) { showDetail(app); return true; }
             return false;
         });
-        return row;
+        row.setLayoutParams(rowParams); return row;
     }
 
     private void showDetail(AppEntry app) {
-        selected = app; base("APP DETAILS");
-        addBack(currentContent, "←  APPS");
+        selected = app; showingSettings = false; base("App details");
+        addBack(currentContent, "Back to apps");
         LinearLayout identity = new LinearLayout(this); identity.setGravity(Gravity.CENTER_VERTICAL);
-        TextView icon = text(app.name.substring(0, 1).toUpperCase(Locale.ROOT), 25, LIME, true);
+        TextView icon = text(app.name.substring(0, 1).toUpperCase(Locale.ROOT), 25, ACCENT, true);
         icon.setGravity(Gravity.CENTER); icon.setBackgroundColor(PANEL_HI);
         identity.addView(icon, new LinearLayout.LayoutParams(dp(64), dp(64)));
         LinearLayout names = new LinearLayout(this); names.setOrientation(LinearLayout.VERTICAL); names.setPadding(dp(14), 0, 0, 0);
         names.addView(text(app.name, 24, FG, true));
         names.addView(text(app.developer, 12, MUTED, false));
         identity.addView(names, new LinearLayout.LayoutParams(0, -2, 1)); currentContent.addView(identity, bottom(dp(18)));
-        TextView category = text(app.category.toUpperCase(Locale.ROOT) + "  ·  " + app.platform.toUpperCase(Locale.ROOT), 10, ORANGE, true);
+        TextView category = text(app.category + "  ·  " + app.platform, 11, ACCENT, true);
         currentContent.addView(category, bottom(dp(9)));
         currentContent.addView(text(app.summary, 15, FG, false), bottom(dp(16)));
-        Button install = button("INSTALL LATEST APK   ↓", BG, LIME);
+        boolean installed = isInstalled(app);
+        currentContent.addView(text(installed ? "Installed on this device · updates are fetched from GitHub." : "Not installed · install the latest GitHub APK below.", 12, MUTED, false), bottom(dp(10)));
+        Button install = button(installed ? "Update from GitHub" : "Install latest APK", BG, ACCENT);
         currentContent.addView(install, bottom(dp(10)));
-        install.setOnClickListener(v -> installLatest(app));
+        install.setOnClickListener(v -> installLatest(app, install));
         TextView release = text("Fetching latest GitHub release…", 12, MUTED, false);
         release.setPadding(0, dp(5), 0, dp(17)); currentContent.addView(release);
         fetchLatest(app, release);
-        sectionLabel(currentContent, "ABOUT THIS APP");
+        sectionLabel(currentContent, "About this app");
         currentContent.addView(text(app.unlisted ? "Added from your GitHub sources. This listing has not been reviewed by DPAD Market.\n\n" + app.curatorNote : app.curatorNote, 13, MUTED, false), bottom(dp(18)));
         addMeta("D-pad support", app.unlisted ? "Unlisted · not reviewed" : app.inputSupport);
         addMeta("License", app.license);
         addMeta("Source repository", app.repository);
         TextView safety = text("GitHub source is not a security audit. Android confirms the install; a published GitHub SHA-256 is checked before handoff.", 11, MUTED, false);
         safety.setPadding(0, dp(15), 0, dp(12)); currentContent.addView(safety, bottom(dp(8)));
-        Button source = button("VIEW SOURCE REPOSITORY   ↗", FG, PANEL_HI); currentContent.addView(source);
+        Button source = button("View source repository", FG, PANEL_HI); currentContent.addView(source);
         source.setOnClickListener(v -> openUrl(app.repository));
     }
 
@@ -217,9 +331,9 @@ public class MainActivity extends Activity {
                 String digest = assetInfo == null ? "" : assetInfo.optString("digest", "");
                 String result = version + (date.isEmpty() ? "" : "  ·  " + date.substring(0, Math.min(10, date.length()))) +
                         (asset == null ? "  ·  No APK asset found" : "  ·  " + asset + (digest.startsWith("sha256:") ? "  ·  SHA-256 published" : "  ·  no published hash"));
-                runOnUiThread(() -> { if (!isFinishing()) target.setText("LATEST RELEASE  /  " + result); });
+                runOnUiThread(() -> { if (!isFinishing()) target.setText("Latest release  /  " + result); });
             } catch (Exception ex) {
-                runOnUiThread(() -> { if (!isFinishing()) target.setText("LATEST RELEASE  /  Could not load from GitHub. Check connection or repository releases."); });
+                runOnUiThread(() -> { if (!isFinishing()) target.setText("Latest release  /  Could not load from GitHub. Check connection or repository releases."); });
             }
         });
     }
@@ -228,14 +342,36 @@ public class MainActivity extends Activity {
         EditText address = new EditText(this);
         address.setSingleLine(true); address.setTextSize(15); address.setTextColor(FG); address.setHintTextColor(MUTED);
         address.setHint("https://github.com/owner/repository");
-        address.setPadding(dp(18), dp(10), dp(18), dp(10));
-        new AlertDialog.Builder(this)
-                .setTitle("Add from GitHub")
-                .setMessage("Paste a public repository URL. This adds it to your device as an unlisted source; it is not curator-reviewed.")
-                .setView(address)
-                .setNegativeButton("Cancel", (dialog, which) -> {})
-                .setPositiveButton("Check source", (dialog, which) -> checkUserSource(address.getText().toString()))
-                .show();
+        address.setPadding(dp(17), 0, dp(17), 0); address.setBackground(rounded(BG, dp(18), RULE));
+
+        LinearLayout panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(20), dp(22), dp(14)); panel.setBackground(rounded(PANEL, dp(26), 0));
+        panel.addView(text("Add a source", 21, FG, true));
+        TextView intro = text("Connect a public GitHub repository to your market. Added sources are marked unreviewed.", 13, MUTED, false);
+        intro.setPadding(0, dp(7), 0, dp(17)); panel.addView(intro);
+        panel.addView(text("Repository URL", 11, ACCENT, true), bottom(dp(6)));
+        panel.addView(address, new LinearLayout.LayoutParams(-1, dp(48)));
+        TextView hint = text("Example: github.com/owner/repository", 11, MUTED, false); hint.setPadding(dp(3), dp(7), 0, 0);
+        panel.addView(hint, bottom(dp(18)));
+
+        LinearLayout actions = new LinearLayout(this); actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        Button cancel = button("Cancel", FG, PANEL_HI); cancel.setTextSize(12);
+        Button check = button("Check source", BG, ACCENT); check.setTextSize(12);
+        actions.addView(cancel, new LinearLayout.LayoutParams(-2, dp(44)));
+        LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(-2, dp(44)); checkParams.leftMargin = dp(8);
+        actions.addView(check, checkParams); panel.addView(actions);
+
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(panel).create();
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        check.setOnClickListener(v -> { dialog.dismiss(); checkUserSource(address.getText().toString()); });
+        dialog.setOnShowListener(d -> {
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawable(rounded(PANEL, dp(26), 0));
+                int width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(28), dp(390));
+                dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+        });
+        dialog.show();
     }
 
     private void checkUserSource(String address) {
@@ -287,10 +423,15 @@ public class MainActivity extends Activity {
         getPreferences(MODE_PRIVATE).edit().putString("user_sources", userApps.toString()).apply();
     }
 
-    private void installLatest(AppEntry app) {
+    private void installLatest(AppEntry app, Button installButton) {
+        installButton.setEnabled(false);
+        installButton.setText("Preparing install...");
         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
             Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
-            startActivity(settings); Toast.makeText(this, "Allow installs for DPAD Market, then choose install again.", Toast.LENGTH_LONG).show(); return;
+            startActivity(settings);
+            installButton.setEnabled(true);
+            installButton.setText("Install latest APK");
+            Toast.makeText(this, "Allow installs for DPAD Market, then choose install again.", Toast.LENGTH_LONG).show(); return;
         }
         Toast.makeText(this, "Checking GitHub release…", Toast.LENGTH_SHORT).show();
         io.execute(() -> {
@@ -304,9 +445,23 @@ public class MainActivity extends Activity {
                 if (size > 350L * 1024 * 1024) throw new Exception("APK asset exceeds the 350 MB safety limit.");
                 installFromUrl(app, apkUrl, release.optString("tag_name", app.name), digest, size);
             } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(this, "Could not prepare install: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> {
+                    installButton.setEnabled(true);
+                    installButton.setText(isInstalled(app) ? "Update from GitHub" : "Install latest APK");
+                    Toast.makeText(this, "Could not prepare install: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
             }
         });
+    }
+
+    private boolean isInstalled(AppEntry app) {
+        if (app.packageId == null || app.packageId.isEmpty()) return false;
+        try {
+            getPackageManager().getPackageInfo(app.packageId, 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return false;
+        }
     }
 
     private void installFromUrl(AppEntry app, String apkUrl, String version, String expectedDigest, long expectedSize) throws Exception {
@@ -381,6 +536,10 @@ public class MainActivity extends Activity {
         connection.setRequestProperty("Accept", "application/vnd.github+json");
         connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
         connection.setRequestProperty("User-Agent", "DPAD-Market-Android");
+        int responseCode = connection.getResponseCode();
+        if (responseCode < 200 || responseCode >= 300) {
+            throw new Exception("GitHub returned HTTP " + responseCode + " for " + Uri.parse(address).getPath());
+        }
         try (InputStream input = connection.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096]; int n; while ((n = input.read(buffer)) != -1) output.write(buffer, 0, n);
             return new JSONObject(output.toString("UTF-8"));
@@ -389,16 +548,16 @@ public class MainActivity extends Activity {
 
     private void addMeta(String key, String value) {
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL); row.setPadding(0, dp(10), 0, dp(10));
-        TextView k = text(key.toUpperCase(Locale.ROOT), 10, MUTED, true); row.addView(k);
+        TextView k = text(key, 11, MUTED, true); row.addView(k);
         TextView v = text(value, 13, FG, false); row.addView(v);
         currentContent.addView(row); View line = new View(this); line.setBackgroundColor(RULE); currentContent.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
     }
-    private void sectionLabel(LinearLayout parent, String label) { TextView t = text(label, 10, LIME, true); parent.addView(t, bottom(dp(8))); }
+    private void sectionLabel(LinearLayout parent, String label) { TextView t = text(label, 10, ACCENT, true); parent.addView(t, bottom(dp(8))); }
     private void addBack(LinearLayout parent, String label) { Button b = button(label, FG, PANEL_HI); parent.addView(b, bottom(dp(22))); b.setOnClickListener(v -> showHome()); }
     private void openUrl(String url) { try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch (Exception e) { Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show(); } }
     private TextView text(String value, int size, int color, boolean bold) {
         TextView t = new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color);
-        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        t.setTypeface(Typeface.create(bold ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
         t.setFocusable(false); return t;
     }
     private Button button(String label, int textColor, int backgroundColor) {
@@ -409,14 +568,87 @@ public class MainActivity extends Activity {
     private android.graphics.drawable.Drawable selectable() { return selectable(PANEL); }
     private android.graphics.drawable.Drawable selectable(int color) {
         android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
-        android.graphics.drawable.GradientDrawable focused = new android.graphics.drawable.GradientDrawable(); focused.setColor(PANEL_HI); focused.setStroke(dp(2), LIME);
-        android.graphics.drawable.GradientDrawable normal = new android.graphics.drawable.GradientDrawable(); normal.setColor(color); normal.setStroke(dp(1), RULE);
+        android.graphics.drawable.GradientDrawable focused = new android.graphics.drawable.GradientDrawable(); focused.setColor(PANEL_HI); focused.setCornerRadius(dp(28)); focused.setStroke(dp(2), ACCENT);
+        android.graphics.drawable.GradientDrawable normal = new android.graphics.drawable.GradientDrawable(); normal.setColor(color); normal.setCornerRadius(dp(28));
         states.addState(new int[]{android.R.attr.state_focused}, focused); states.addState(new int[]{android.R.attr.state_pressed}, focused); states.addState(new int[]{}, normal); return states;
+    }
+    private android.graphics.drawable.Drawable rounded(int color, float radius, int strokeColor) {
+        android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+        shape.setColor(color); shape.setCornerRadius(radius);
+        if (strokeColor != 0) shape.setStroke(dp(1), strokeColor);
+        return shape;
+    }
+
+    private void loadIcon(AppEntry app, ImageView target, TextView fallback) {
+        String cacheKey = app.id;
+        Bitmap cached = iconCache.get(cacheKey);
+        if (cached != null) {
+            target.setImageBitmap(cached); target.setVisibility(View.VISIBLE); fallback.setVisibility(View.GONE); return;
+        }
+        io.execute(() -> {
+            try {
+                File iconDirectory = new File(getCacheDir(), "app-icons");
+                if (!iconDirectory.exists() && !iconDirectory.mkdirs()) return;
+                File apk = new File(iconDirectory, cacheKey.replaceAll("[^A-Za-z0-9._-]", "_") + ".apk");
+                if (!apk.exists()) downloadIconApk(app, apk);
+                PackageInfo packageInfo = getPackageManager().getPackageArchiveInfo(apk.getPath(), PackageManager.GET_META_DATA);
+                if (packageInfo == null) return;
+                if (!app.packageId.isEmpty() && !app.packageId.equals(packageInfo.packageName)) return;
+                packageInfo.applicationInfo.sourceDir = apk.getPath();
+                packageInfo.applicationInfo.publicSourceDir = apk.getPath();
+                Drawable drawable = packageInfo.applicationInfo.loadIcon(getPackageManager());
+                Bitmap bitmap = drawableToBitmap(drawable);
+                if (bitmap == null) return;
+                synchronized (iconCache) { iconCache.put(cacheKey, bitmap); }
+                runOnUiThread(() -> {
+                    if (target.getParent() != null) {
+                        target.setImageBitmap(bitmap); target.setVisibility(View.VISIBLE); fallback.setVisibility(View.GONE);
+                    }
+                });
+            } catch (Exception ignored) { }
+        });
+    }
+
+    private void downloadIconApk(AppEntry app, File destination) throws Exception {
+        JSONObject release = getJson(app.releaseApi);
+        JSONObject asset = findApkAsset(release);
+        if (asset == null) return;
+        String apkUrl = asset.optString("browser_download_url", null);
+        if (apkUrl == null) return;
+        long expectedSize = asset.optLong("size", -1);
+        if (expectedSize > 350L * 1024 * 1024) return;
+        HttpURLConnection connection = (HttpURLConnection) new URL(apkUrl).openConnection();
+        connection.setConnectTimeout(20000); connection.setReadTimeout(30000);
+        connection.setRequestProperty("User-Agent", "DPAD-Market/0.1");
+        connection.connect();
+        if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) throw new Exception("Icon APK download returned HTTP " + connection.getResponseCode());
+        File temporary = new File(destination.getPath() + ".part");
+        try (InputStream input = new BufferedInputStream(connection.getInputStream()); OutputStream output = new FileOutputStream(temporary)) {
+            byte[] buffer = new byte[32768]; int count; long total = 0;
+            while ((count = input.read(buffer)) != -1) {
+                total += count;
+                if (total > 350L * 1024 * 1024) throw new Exception("Icon APK download exceeds the 350 MB safety limit.");
+                output.write(buffer, 0, count);
+            }
+            if (expectedSize >= 0 && total != expectedSize) throw new Exception("Icon APK size does not match GitHub metadata.");
+        } finally { connection.disconnect(); }
+        if (!temporary.renameTo(destination)) throw new Exception("Could not cache icon APK.");
+    }
+
+    private Bitmap drawableToBitmap(Drawable drawable) {
+        if (drawable == null) return null;
+        int width = Math.max(dp(48), drawable.getIntrinsicWidth());
+        int height = Math.max(dp(48), drawable.getIntrinsicHeight());
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        drawable.setBounds(0, 0, width, height); drawable.draw(canvas);
+        return bitmap;
     }
     private LinearLayout.LayoutParams bottom(int margin) { LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2); p.bottomMargin = margin; return p; }
     private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
     @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK && selected != null) { selected = null; showHome(); return true; }
+        if (keyCode == KeyEvent.KEYCODE_BACK && showingSettings) { showHome(); return true; }
         return super.onKeyDown(keyCode, event);
     }
     @Override protected void onDestroy() { super.onDestroy(); }
