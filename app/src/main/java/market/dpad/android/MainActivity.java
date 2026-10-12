@@ -306,6 +306,11 @@ public class MainActivity extends Activity {
         Button install = button(installed ? "Update from GitHub" : "Install latest APK", BG, ACCENT);
         currentContent.addView(install, bottom(dp(10)));
         install.setOnClickListener(v -> installLatest(app, install));
+        if (installed) {
+            Button uninstall = button("Uninstall", FG, PANEL_HI);
+            currentContent.addView(uninstall, bottom(dp(10)));
+            uninstall.setOnClickListener(v -> uninstallApp(app));
+        }
         TextView release = text("Fetching latest GitHub release…", 12, MUTED, false);
         release.setPadding(0, dp(5), 0, dp(17)); currentContent.addView(release);
         fetchLatest(app, release);
@@ -461,6 +466,15 @@ public class MainActivity extends Activity {
             return true;
         } catch (PackageManager.NameNotFoundException ignored) {
             return false;
+        }
+    }
+
+    private void uninstallApp(AppEntry app) {
+        if (app.packageId == null || app.packageId.isEmpty()) return;
+        try {
+            startActivity(new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + app.packageId)));
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not open Android's uninstall screen.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -652,6 +666,10 @@ public class MainActivity extends Activity {
         return super.onKeyDown(keyCode, event);
     }
     @Override protected void onDestroy() { super.onDestroy(); }
+    @Override protected void onResume() {
+        super.onResume();
+        if (selected != null && !isInstalled(selected)) showDetail(selected);
+    }
 
     static class AppEntry {
         String id, packageId, name, developer, repository, releaseApi, category, summary, curatorNote, license, platform, inputSupport;

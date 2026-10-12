@@ -2,6 +2,18 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <queries>
+        <package android:name="io.github.sds100.keymapper" />
+        <package android:name="app.vela" />
+        <package android:name="com.dpad.messaging" />
+        <package android:name="com.example.dpadplayer" />
+        <package android:name="org.fossify.phone" />
+        <package android:name="org.fossify.contacts" />
+        <package android:name="org.fossify.clock" />
+        <package android:name="org.fossify.math" />
+        <package android:name="com.minispot.app" />
+        <package android:name="app.inkos" />
+    </queries>
     <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="@string/app_name" android:icon="@drawable/ic_market" android:usesCleartextTraffic="false" android:allowBackup="true" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
