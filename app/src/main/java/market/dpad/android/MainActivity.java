@@ -11,6 +11,7 @@ import android.graphics.Canvas;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
@@ -184,10 +185,10 @@ public class MainActivity extends Activity {
         root.addView(rule, new LinearLayout.LayoutParams(-1, dp(1)));
         LinearLayout bar = new LinearLayout(this); bar.setGravity(Gravity.CENTER); bar.setPadding(dp(12), dp(7), dp(12), dp(9));
         bar.setBackgroundColor(PANEL);
-        LinearLayout apps = navItem("▦", "Apps", !showingDownloaded, () -> {
+        LinearLayout apps = navItem("Apps", !showingDownloaded, false, () -> {
             if (showingDownloaded) { showingDownloaded = false; showHome(); }
         });
-        LinearLayout downloaded = navItem("↓", "Downloaded", showingDownloaded, () -> {
+        LinearLayout downloaded = navItem("Downloaded", showingDownloaded, true, () -> {
             if (!showingDownloaded) { showingDownloaded = true; showHome(); }
         });
         bar.addView(apps, new LinearLayout.LayoutParams(0, dp(62), 1));
@@ -196,12 +197,12 @@ public class MainActivity extends Activity {
         root.addView(bar, new LinearLayout.LayoutParams(-1, -2));
     }
 
-    private LinearLayout navItem(String symbol, String label, boolean selected, Runnable action) {
+    private LinearLayout navItem(String label, boolean selected, boolean downloaded, Runnable action) {
         int color = selected ? POSITIVE : MUTED;
         LinearLayout item = new LinearLayout(this); item.setOrientation(LinearLayout.VERTICAL); item.setGravity(Gravity.CENTER);
         item.setFocusable(true); item.setClickable(true); item.setPadding(dp(8), dp(4), dp(8), dp(4));
         item.setBackground(selectable(selected ? PANEL_HI : PANEL));
-        TextView icon = text(symbol, 21, color, true); icon.setGravity(Gravity.CENTER); item.addView(icon);
+        NavIconView icon = new NavIconView(downloaded, color); icon.setContentDescription(label); item.addView(icon, new LinearLayout.LayoutParams(dp(28), dp(28)));
         TextView title = text(label, 11, color, selected); title.setGravity(Gravity.CENTER); title.setPadding(0, dp(2), 0, 0); item.addView(title);
         item.setOnClickListener(v -> action.run()); item.setOnKeyListener((v, key, event) -> {
             if (event.getAction() == KeyEvent.ACTION_UP && (key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER)) {
@@ -210,6 +211,29 @@ public class MainActivity extends Activity {
             return false;
         });
         return item;
+    }
+
+    private class NavIconView extends View {
+        private final boolean downloaded;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        NavIconView(boolean downloaded, int color) {
+            super(MainActivity.this); this.downloaded = downloaded; paint.setColor(color); paint.setStrokeCap(Paint.Cap.ROUND); paint.setStrokeJoin(Paint.Join.ROUND);
+        }
+        @Override protected void onDraw(Canvas canvas) {
+            float scale = Math.min(getWidth(), getHeight()) / 24f; canvas.save(); canvas.scale(scale, scale);
+            if (downloaded) {
+                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(2.1f);
+                canvas.drawRoundRect(4, 14, 20, 20, 2, 2, paint);
+                canvas.drawLine(12, 4, 12, 15, paint); canvas.drawLine(8, 11, 12, 15, paint); canvas.drawLine(16, 11, 12, 15, paint);
+            } else {
+                paint.setStyle(Paint.Style.FILL);
+                canvas.drawRoundRect(4, 4, 10.5f, 10.5f, 1.5f, 1.5f, paint);
+                canvas.drawRoundRect(13.5f, 4, 20, 10.5f, 1.5f, 1.5f, paint);
+                canvas.drawRoundRect(4, 13.5f, 10.5f, 20, 1.5f, 1.5f, paint);
+                canvas.drawRoundRect(13.5f, 13.5f, 20, 20, 1.5f, 1.5f, paint);
+            }
+            canvas.restore();
+        }
     }
 
     private void showHome() {
