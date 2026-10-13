@@ -214,7 +214,7 @@
     },
     {
       "id": "quik",
-      "packageId": "dev.octoshrimpy.quik",
+      "packageId": "com.jmtditech.quik",
       "name": "QUIK (D-pad)",
       "developer": "JMTDI",
       "repository": "https://github.com/JMTDI/quik",
