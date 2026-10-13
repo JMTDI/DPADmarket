@@ -50,9 +50,13 @@ also be checked from **Settings -> Check for DPAD Market updates**.
 
 ## How the catalog works
 
-Curated listings are bundled in
-[`app/src/main/assets/catalog.json`](app/src/main/assets/catalog.json). When an
-app's details are opened, DPAD Market requests its public GitHub
+The catalog is published from
+[`app/src/main/assets/catalog.json`](app/src/main/assets/catalog.json) on the
+DPAD Market GitHub repository. The app fetches the latest valid catalog on
+launch and caches it locally. The bundled file remains an offline fallback, so
+catalog updates do not require a new APK release.
+
+When an app's details are opened, DPAD Market requests its public GitHub
 `releases/latest` endpoint and presents the current release and APK asset.
 
 Screenshots are not copied into this repository. The detail page reads the
@@ -68,6 +72,7 @@ Those entries stay local to the device and are clearly marked as unreviewed.
 DPAD Market is a catalog and installer, not a security audit.
 
 - Every listing exposes its upstream repository and declared package ID.
+- Remote catalogs must pass schema, duplicate-ID, and GitHub URL validation.
 - Curated APKs must match the package ID in catalog metadata.
 - Downloads come from GitHub over HTTPS.
 - Published GitHub SHA-256 asset digests are checked when available.

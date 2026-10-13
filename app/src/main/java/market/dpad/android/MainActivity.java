@@ -58,6 +58,7 @@ import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
     private static final String MARKET_RELEASE_API = "https://api.github.com/repos/jbriones95/DPADmarket/releases/latest";
+    private static final String REMOTE_CATALOG_URL = "https://raw.githubusercontent.com/jbriones95/DPADmarket/main/app/src/main/assets/catalog.json";
     private int BG, PANEL, PANEL_HI, RULE, FG, MUTED, ACCENT, POSITIVE, WARNING;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final List<AppEntry> catalog = new ArrayList<>();
@@ -80,6 +81,7 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(0);
         loadCatalog();
         showHome();
+        refreshRemoteCatalog(false);
     }
 
     private void applyThemeColors() {
@@ -99,11 +101,62 @@ public class MainActivity extends Activity {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buffer = new byte[4096]; int n;
             while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
-            JSONArray array = new JSONObject(out.toString("UTF-8")).getJSONArray("apps");
-            for (int i = 0; i < array.length(); i++) catalog.add(AppEntry.from(array.getJSONObject(i)));
-            JSONArray personal = new JSONArray(getPreferences(MODE_PRIVATE).getString("user_sources", "[]"));
-            for (int i = 0; i < personal.length(); i++) catalog.add(AppEntry.from(personal.getJSONObject(i)));
+            JSONObject source = new JSONObject(out.toString("UTF-8"));
+            String cached = getPreferences(MODE_PRIVATE).getString("remote_catalog", "");
+            if (!cached.isEmpty()) {
+                try {
+                    JSONObject cachedSource = new JSONObject(cached);
+                    if (validCatalog(cachedSource)) source = cachedSource;
+                } catch (Exception ignored) { }
+            }
+            addCatalogApps(source);
+            addUserSources();
         } catch (Exception e) { Toast.makeText(this, "Could not read the app catalog", Toast.LENGTH_LONG).show(); }
+    }
+
+    private void addCatalogApps(JSONObject source) throws Exception {
+        JSONArray apps = source.getJSONArray("apps");
+        for (int i = 0; i < apps.length(); i++) {
+            AppEntry app = AppEntry.from(apps.getJSONObject(i)); app.unlisted = false; catalog.add(app);
+        }
+    }
+
+    private void addUserSources() throws Exception {
+        JSONArray personal = new JSONArray(getPreferences(MODE_PRIVATE).getString("user_sources", "[]"));
+        for (int i = 0; i < personal.length(); i++) catalog.add(AppEntry.from(personal.getJSONObject(i)));
+    }
+
+    private boolean validCatalog(JSONObject source) {
+        if (source.optInt("schemaVersion", -1) != 1) return false;
+        JSONArray apps = source.optJSONArray("apps"); if (apps == null) return false;
+        Set<String> ids = new HashSet<>();
+        for (int i = 0; i < apps.length(); i++) {
+            JSONObject app = apps.optJSONObject(i); if (app == null) return false;
+            for (String field : new String[]{"id", "packageId", "name", "developer", "repository", "releaseApi", "category", "summary", "license", "platform", "inputSupport"}) {
+                if (app.optString(field, "").trim().isEmpty()) return false;
+            }
+            if (!ids.add(app.optString("id")) || !app.optString("repository").startsWith("https://github.com/") ||
+                    !app.optString("releaseApi").startsWith("https://api.github.com/repos/")) return false;
+        }
+        return true;
+    }
+
+    private void refreshRemoteCatalog(boolean notify) {
+        io.execute(() -> {
+            try {
+                JSONObject remote = getJson(REMOTE_CATALOG_URL);
+                if (!validCatalog(remote)) throw new Exception("Remote catalog failed validation");
+                getPreferences(MODE_PRIVATE).edit().putString("remote_catalog", remote.toString()).apply();
+                runOnUiThread(() -> {
+                    for (int i = catalog.size() - 1; i >= 0; i--) if (!catalog.get(i).unlisted) catalog.remove(i);
+                    try { addCatalogApps(remote); } catch (Exception ignored) { return; }
+                    if (notify) Toast.makeText(this, "App catalog refreshed.", Toast.LENGTH_SHORT).show();
+                    if (showingSettings) showSettings(); else if (selected == null) showHome();
+                });
+            } catch (Exception e) {
+                if (notify) runOnUiThread(() -> Toast.makeText(this, "Could not refresh app catalog.", Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void base(String title) {
@@ -251,6 +304,7 @@ public class MainActivity extends Activity {
         });
 
         sectionLabel(currentContent, "Catalog");
+        settingRow("Refresh app catalog", "Fetch the latest approved listings from GitHub", () -> refreshRemoteCatalog(true));
         settingRow("Show unreviewed sources", showUnreviewedSources() ? "On  ·  User-added GitHub sources appear in the catalog" : "Off  ·  Hide user-added GitHub sources", () -> {
             getPreferences(MODE_PRIVATE).edit().putBoolean("show_unreviewed_sources", !showUnreviewedSources()).apply();
             showSettings();
