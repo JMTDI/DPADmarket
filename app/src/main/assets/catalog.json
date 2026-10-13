@@ -211,6 +211,20 @@
       "license": "Apache-2.0",
       "platform": "Android",
       "inputSupport": "Keypad and D-pad supported"
+    },
+    {
+      "id": "quik",
+      "packageId": "dev.octoshrimpy.quik",
+      "name": "QUIK (D-pad)",
+      "developer": "JMTDI",
+      "repository": "https://github.com/JMTDI/quik",
+      "releaseApi": "https://api.github.com/repos/JMTDI/quik/releases/latest",
+      "category": "Communication",
+      "summary": "QUIK SMS messenger patched with full D-pad and keypad navigation.",
+      "curatorNote": "Upstream QUIK with a D-pad patch set applied and published as signed APK releases.",
+      "license": "GPL-3.0",
+      "platform": "Android",
+      "inputSupport": "D-pad supported"
     }
   ]
 }
