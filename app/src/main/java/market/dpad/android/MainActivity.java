@@ -722,8 +722,8 @@ public class MainActivity extends Activity {
     }
 
     private int compareVersions(String candidate, String current) {
-        String[] candidateParts = candidate.split("[.+-]", 2)[0].split("\\.");
-        String[] currentParts = current.split("[.+-]", 2)[0].replaceFirst("^[vV]", "").split("\\.");
+        String[] candidateParts = candidate.split("[+-]", 2)[0].split("\\.");
+        String[] currentParts = current.split("[+-]", 2)[0].replaceFirst("^[vV]", "").split("\\.");
         int count = Math.max(candidateParts.length, currentParts.length);
         for (int i = 0; i < count; i++) {
             long candidatePart = i < candidateParts.length ? parseVersionPart(candidateParts[i]) : 0;
