@@ -50,11 +50,12 @@ also be checked from **Settings -> Check for DPAD Market updates**.
 
 ## How the catalog works
 
-The catalog is published from
-[`app/src/main/assets/catalog.json`](app/src/main/assets/catalog.json) on the
-DPAD Market GitHub repository. The app fetches the latest valid catalog on
-launch and caches it locally. The bundled file remains an offline fallback, so
-catalog updates do not require a new APK release.
+The app fetches the base catalog from
+[`app/src/main/assets/catalog.json`](app/src/main/assets/catalog.json) and
+remote additions from [`catalog.remote.json`](catalog.remote.json) on the DPAD
+Market GitHub repository. It combines both files, validates the result, and
+caches it locally on launch. The bundled base file remains an offline fallback,
+so new catalog listings do not require a new APK release.
 
 When an app's details are opened, DPAD Market requests its public GitHub
 `releases/latest` endpoint and presents the current release and APK asset.
@@ -106,12 +107,15 @@ workflow supplies them from repository secrets.
 
 ## Add an app
 
-Open a pull request that adds metadata to `catalog.json`. A proposed listing
+Open a pull request that adds metadata to `catalog.remote.json`. New listings
+in that file are delivered through the remote catalog and are not embedded in
+the APK. A proposed listing
 should include:
 
 - A public GitHub repository with a direct APK release asset.
 - The verified Android package ID and SPDX license.
 - An accurate category, summary, and D-pad support note.
+- `apkAsset` when a release has multiple APK choices and one should be preferred.
 - `Needs device testing` when compatibility has not been checked on hardware.
 
 A listing is a curator recommendation, not a security audit.

@@ -60,6 +60,7 @@ import java.util.regex.Pattern;
 public class MainActivity extends Activity {
     private static final String MARKET_RELEASE_API = "https://api.github.com/repos/jbriones95/DPADmarket/releases/latest";
     private static final String REMOTE_CATALOG_URL = "https://raw.githubusercontent.com/jbriones95/DPADmarket/main/app/src/main/assets/catalog.json";
+    private static final String REMOTE_CATALOG_ADDITIONS_URL = "https://raw.githubusercontent.com/jbriones95/DPADmarket/main/catalog.remote.json";
     private int BG, PANEL, PANEL_HI, RULE, FG, MUTED, ACCENT, POSITIVE, WARNING;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final List<AppEntry> catalog = new ArrayList<>();
@@ -145,7 +146,7 @@ public class MainActivity extends Activity {
     private void refreshRemoteCatalog(boolean notify) {
         io.execute(() -> {
             try {
-                JSONObject remote = getJson(REMOTE_CATALOG_URL);
+                JSONObject remote = mergeCatalogs(getJson(REMOTE_CATALOG_URL), getJson(REMOTE_CATALOG_ADDITIONS_URL));
                 if (!validCatalog(remote)) throw new Exception("Remote catalog failed validation");
                 getPreferences(MODE_PRIVATE).edit().putString("remote_catalog", remote.toString()).apply();
                 runOnUiThread(() -> {
@@ -158,6 +159,14 @@ public class MainActivity extends Activity {
                 if (notify) runOnUiThread(() -> Toast.makeText(this, "Could not refresh app catalog.", Toast.LENGTH_LONG).show());
             }
         });
+    }
+
+    private JSONObject mergeCatalogs(JSONObject base, JSONObject additions) throws Exception {
+        JSONObject merged = new JSONObject(base.toString());
+        JSONArray apps = merged.getJSONArray("apps");
+        JSONArray extraApps = additions.getJSONArray("apps");
+        for (int i = 0; i < extraApps.length(); i++) apps.put(extraApps.getJSONObject(i));
+        return merged;
     }
 
     private void base(String title) {
@@ -569,7 +578,7 @@ public class MainActivity extends Activity {
                 JSONObject release = getJson(app.releaseApi);
                 String version = release.optString("tag_name", "release");
                 String date = release.optString("published_at", "");
-                JSONObject assetInfo = findApkAsset(release);
+                JSONObject assetInfo = findApkAsset(release, app);
                 String asset = assetInfo == null ? null : assetInfo.optString("name");
                 String digest = assetInfo == null ? "" : assetInfo.optString("digest", "");
                 String result = version + (date.isEmpty() ? "" : "  ·  " + date.substring(0, Math.min(10, date.length()))) +
@@ -680,7 +689,7 @@ public class MainActivity extends Activity {
         io.execute(() -> {
             try {
                 JSONObject release = getJson(app.releaseApi);
-                JSONObject asset = findApkAsset(release);
+                JSONObject asset = findApkAsset(release, app);
                 if (asset == null) throw new Exception("This release does not provide a direct APK asset.");
                 String apkUrl = asset.optString("browser_download_url", null);
                 String digest = asset.optString("digest", "");
@@ -831,6 +840,10 @@ public class MainActivity extends Activity {
     }
 
     private JSONObject findApkAsset(JSONObject release) {
+        return findApkAsset(release, null);
+    }
+
+    private JSONObject findApkAsset(JSONObject release, AppEntry app) {
         JSONArray assets = release.optJSONArray("assets"); if (assets == null) return null;
         JSONObject best = null; int bestScore = -1;
         String abi = Build.SUPPORTED_ABIS.length == 0 ? "" : Build.SUPPORTED_ABIS[0];
@@ -842,6 +855,7 @@ public class MainActivity extends Activity {
             if (lower.contains("universal")) score += 4;
             if (!abi.isEmpty() && lower.contains(abi.toLowerCase(Locale.ROOT))) score += 8;
             if (lower.contains("release")) score++;
+            if (app != null && !app.apkAsset.isEmpty() && lower.contains(app.apkAsset.toLowerCase(Locale.ROOT))) score += 16;
             if (score > bestScore) { bestScore = score; best = item; }
         }
         return best;
@@ -928,7 +942,7 @@ public class MainActivity extends Activity {
 
     private void downloadIconApk(AppEntry app, File destination) throws Exception {
         JSONObject release = getJson(app.releaseApi);
-        JSONObject asset = findApkAsset(release);
+        JSONObject asset = findApkAsset(release, app);
         if (asset == null) return;
         String apkUrl = asset.optString("browser_download_url", null);
         if (apkUrl == null) return;
@@ -979,13 +993,13 @@ public class MainActivity extends Activity {
     }
 
     static class AppEntry {
-        String id, packageId, name, developer, repository, releaseApi, category, summary, curatorNote, license, platform, inputSupport;
+        String id, packageId, name, developer, repository, releaseApi, category, summary, curatorNote, license, platform, inputSupport, apkAsset;
         boolean unlisted;
         static AppEntry from(JSONObject o) {
             AppEntry a = new AppEntry(); a.id=o.optString("id"); a.packageId=o.optString("packageId"); a.name=o.optString("name"); a.developer=o.optString("developer");
             a.repository=o.optString("repository"); a.releaseApi=o.optString("releaseApi"); a.category=o.optString("category");
             a.summary=o.optString("summary"); a.curatorNote=o.optString("curatorNote"); a.license=o.optString("license");
-            a.platform=o.optString("platform"); a.inputSupport=o.optString("inputSupport"); a.unlisted=o.optBoolean("unlisted", false); return a;
+            a.platform=o.optString("platform"); a.inputSupport=o.optString("inputSupport"); a.apkAsset=o.optString("apkAsset"); a.unlisted=o.optBoolean("unlisted", false); return a;
         }
         JSONObject toJson() {
             JSONObject o = new JSONObject();
@@ -993,7 +1007,7 @@ public class MainActivity extends Activity {
                 o.put("id", id); o.put("packageId", packageId); o.put("name", name); o.put("developer", developer);
                 o.put("repository", repository); o.put("releaseApi", releaseApi); o.put("category", category);
                 o.put("summary", summary); o.put("curatorNote", curatorNote); o.put("license", license);
-                o.put("platform", platform); o.put("inputSupport", inputSupport); o.put("unlisted", unlisted);
+                o.put("platform", platform); o.put("inputSupport", inputSupport); o.put("apkAsset", apkAsset); o.put("unlisted", unlisted);
             } catch (Exception ignored) { }
             return o;
         }
