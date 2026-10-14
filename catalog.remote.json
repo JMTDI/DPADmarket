@@ -201,17 +201,17 @@
     {
       "id": "tt9",
       "packageId": "io.github.sspanak.tt9",
-      "name": "TT9 (Offline Voice)",
-      "developer": "JMTDI",
-      "repository": "https://github.com/JMTDI/tt9",
-      "releaseApi": "https://api.github.com/repos/JMTDI/tt9/releases/latest",
+      "name": "TT9",
+      "developer": "sspanak",
+      "repository": "https://github.com/sspanak/tt9",
+      "releaseApi": "https://api.github.com/repos/sspanak/tt9/releases/latest",
       "category": "Tools",
-      "summary": "T9 keyboard for keypad phones with offline voice typing using Whistle.",
-      "curatorNote": "A build of the TT9 keyboard with offline speech-to-text. The lite APK is selected to reduce the download size; enable the keyboard in system settings after installation.",
+      "summary": "A Nokia-style T9 keyboard for Android keypad phones and D-pad devices.",
+      "curatorNote": "The official TT9 keyboard supports predictive text, physical keypads, and TV-remote-style controls. The standard APK is selected instead of the large full language-pack build.",
       "license": "Apache-2.0",
       "platform": "Android",
       "inputSupport": "Keypad and D-pad supported",
-      "apkAsset": "lite"
+      "apkAsset": "tt9-v64.0.apk"
     },
     {
       "id": "quik",

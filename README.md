@@ -29,6 +29,13 @@ D-pad or keyboard.
 - Supports light and dark monochrome themes.
 - Checks for DPAD Market updates from GitHub Releases.
 
+## Contributors
+
+- [sspanak](https://github.com/sspanak) created and maintains Traditional T9,
+  the official keyboard listed in the catalog.
+- [JMTDI](https://github.com/JMTDI) contributed the TT9/QUIK catalog work and
+  the offline-voice TT9 variant that prompted the integration.
+
 ## Screenshots
 
 <p align="center">
