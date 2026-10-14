@@ -59,8 +59,7 @@ import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
     private static final String MARKET_RELEASE_API = "https://api.github.com/repos/jbriones95/DPADmarket/releases/latest";
-    private static final String REMOTE_CATALOG_URL = "https://raw.githubusercontent.com/jbriones95/DPADmarket/main/app/src/main/assets/catalog.json";
-    private static final String REMOTE_CATALOG_ADDITIONS_URL = "https://raw.githubusercontent.com/jbriones95/DPADmarket/main/catalog.remote.json";
+    private static final String REMOTE_CATALOG_URL = "https://raw.githubusercontent.com/jbriones95/DPADmarket/main/catalog.remote.json";
     private int BG, PANEL, PANEL_HI, RULE, FG, MUTED, ACCENT, POSITIVE, WARNING;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final List<AppEntry> catalog = new ArrayList<>();
@@ -146,7 +145,7 @@ public class MainActivity extends Activity {
     private void refreshRemoteCatalog(boolean notify) {
         io.execute(() -> {
             try {
-                JSONObject remote = mergeCatalogs(getJson(REMOTE_CATALOG_URL), getJson(REMOTE_CATALOG_ADDITIONS_URL));
+                JSONObject remote = getJson(REMOTE_CATALOG_URL);
                 if (!validCatalog(remote)) throw new Exception("Remote catalog failed validation");
                 getPreferences(MODE_PRIVATE).edit().putString("remote_catalog", remote.toString()).apply();
                 runOnUiThread(() -> {
@@ -159,14 +158,6 @@ public class MainActivity extends Activity {
                 if (notify) runOnUiThread(() -> Toast.makeText(this, "Could not refresh app catalog.", Toast.LENGTH_LONG).show());
             }
         });
-    }
-
-    private JSONObject mergeCatalogs(JSONObject base, JSONObject additions) throws Exception {
-        JSONObject merged = new JSONObject(base.toString());
-        JSONArray apps = merged.getJSONArray("apps");
-        JSONArray extraApps = additions.getJSONArray("apps");
-        for (int i = 0; i < extraApps.length(); i++) apps.put(extraApps.getJSONObject(i));
-        return merged;
     }
 
     private void base(String title) {

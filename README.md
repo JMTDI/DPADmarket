@@ -50,12 +50,11 @@ also be checked from **Settings -> Check for DPAD Market updates**.
 
 ## How the catalog works
 
-The app fetches the base catalog from
-[`app/src/main/assets/catalog.json`](app/src/main/assets/catalog.json) and
-remote additions from [`catalog.remote.json`](catalog.remote.json) on the DPAD
-Market GitHub repository. It combines both files, validates the result, and
-caches it locally on launch. The bundled base file remains an offline fallback,
-so new catalog listings do not require a new APK release.
+The app fetches the complete catalog from
+[`catalog.remote.json`](catalog.remote.json) on the DPAD Market GitHub
+repository, validates it, and caches it locally on launch. The bundled catalog
+file is intentionally empty and schema-valid, so all curated app listings are
+remote and new catalog entries do not require a new APK release.
 
 When an app's details are opened, DPAD Market requests its public GitHub
 `releases/latest` endpoint and presents the current release and APK asset.
